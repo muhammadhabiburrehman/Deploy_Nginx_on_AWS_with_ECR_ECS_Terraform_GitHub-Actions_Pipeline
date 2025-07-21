@@ -24,6 +24,9 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
       - name: Get ECR repo name from Terraform output
         id: tf-output
         run: |
@@ -43,5 +46,6 @@ jobs:
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
+      - name: Terraform Destroy
+        if: always() # ensures destroy runs even if previous step fails
+        run: terraform destroy -auto-approve
