@@ -5,13 +5,7 @@ on:
 
 jobs:
   deploy:
-    name: Build and Deploy
     runs-on: ubuntu-latest
-
-    env:
-      AWS_REGION: us-east-1
-      ECR_REPO: your-ecr-repo-name
-      IMAGE_TAG: latest
 
     steps:
       - name: Checkout code
@@ -22,16 +16,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
 
-      - name: Build Docker image
-        run: |
-          docker build -t $ECR_REPO:$IMAGE_TAG .
-          docker tag $ECR_REPO:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:$IMAGE_TAG
+      - name: Terraform Init
+        run: terraform init
 
       - name: Get ECR repo name from Terraform output
         id: tf-output
@@ -39,15 +30,18 @@ jobs:
           ECR_REPO=$(terraform output -raw ecr_repository_name)
           echo "ECR_REPO=$ECR_REPO" >> $GITHUB_ENV
 
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_REPO:latest .
+          docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
+
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:$IMAGE_TAG
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init
-        run: terraform init
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
